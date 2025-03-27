@@ -1,12 +1,12 @@
-# Scaling Strategy
+# Zebros CRM Scaling Strategy
 
-This document outlines the scaling strategy for the serverless architecture, ensuring it can grow from a minimal initial deployment to a full-scale production system.
+This document outlines the scaling strategy for the Zebros CRM serverless architecture, ensuring it can grow from a minimal initial deployment to a full-scale enterprise CRM system.
 
-## Initial Deployment (Minimum Viable Architecture)
+## Initial Deployment (Minimum Viable CRM)
 
 ```mermaid
 flowchart TB
-    subgraph "Minimum Viable Architecture"
+    subgraph "Minimum Viable CRM Architecture"
         API[API Gateway] --> Lambda[Lambda Functions]
         API --> StepF[Step Functions]
         Lambda --> DynamoDB[(DynamoDB)]
@@ -24,35 +24,66 @@ Initial sizing:
 - API Gateway: Default quotas
 - Aurora Serverless: 1 ACU min, 2 ACU max
 
-## Scaling Dimensions
+## Scaling Dimensions for Zebros CRM
 
 ```mermaid
 flowchart TD
-    Root[Scaling Dimensions] --> Users[Users/Tenants]
-    Root --> Data[Data Volume]
+    Root[Scaling Dimensions] --> Users[CRM Users]
+    Root --> Customers[Customer Records]
     Root --> Throughput[Request Throughput]
-    Root --> Tasks[Long-running Tasks]
+    Root --> Reports[CRM Reports & Analytics]
     
     Users --> Scale1[Keycloak Capacity]
     Users --> Scale2[Authentication Cache]
     
-    Data --> Scale3[DynamoDB Capacity]
-    Data --> Scale4[S3 Organization]
+    Customers --> Scale3[DynamoDB Capacity]
+    Customers --> Scale4[S3 Organization]
     
     Throughput --> Scale5[Lambda Concurrency]
     Throughput --> Scale6[API Gateway Capacity]
     
-    Tasks --> Scale7[Fargate Task Size]
-    Tasks --> Scale8[Maximum Concurrency]
+    Reports --> Scale7[Fargate Task Size]
+    Reports --> Scale8[Maximum Concurrency]
+```
+
+## CRM Usage Tiers and Scaling
+
+```mermaid
+flowchart LR
+    Start[Initial Deployment] --> T1[Tier 1: Startup]
+    T1 --> T2[Tier 2: Growing Business]
+    T2 --> T3[Tier 3: Enterprise]
+    
+    subgraph "CRM Usage Metrics"
+        Users[CRM Users]
+        Customers[Customer Records]
+        Opportunities[Opportunities]
+        DataVolume[Data Volume]
+    end
+    
+    T1 --> |"<25 Users"| Users
+    T1 --> |"<1K Customers"| Customers
+    T1 --> |"<100 Opportunities"| Opportunities
+    T1 --> |"<5GB Data"| DataVolume
+    
+    T2 --> |"25-100 Users"| Users
+    T2 --> |"1K-10K Customers"| Customers
+    T2 --> |"100-1K Opportunities"| Opportunities
+    T2 --> |"5-50GB Data"| DataVolume
+    
+    T3 --> |">100 Users"| Users
+    T3 --> |">10K Customers"| Customers
+    T3 --> |">1K Opportunities"| Opportunities
+    T3 --> |">50GB Data"| DataVolume
 ```
 
 ## Phased Scaling Approach
 
-### Phase 1: Early Production (1K Users)
+### Phase 1: Startup CRM (25 Users)
 
 ```mermaid
 flowchart TB
-    subgraph "Phase 1: Early Production"
+    subgraph "Phase 1: Startup CRM"
         API[API Gateway] --> Lambda[Lambda Functions]
         API --> StepF[Step Functions]
         Lambda --> DynamoDB[(DynamoDB)]
@@ -68,11 +99,11 @@ flowchart TB
 - DynamoDB: Begin provisioned capacity with auto-scaling
 - Aurora: 2 ACU min, 4 ACU max
 
-### Phase 2: Growth (10K Users)
+### Phase 2: Growing Business CRM (100 Users)
 
 ```mermaid
 flowchart TB
-    subgraph "Phase 2: Growth"
+    subgraph "Phase 2: Growing Business CRM"
         API[API Gateway] --> Lambda[Lambda Functions]
         API --> StepF[Step Functions]
         Lambda --> DDBTable[DynamoDB Tables]
@@ -84,9 +115,10 @@ flowchart TB
             KeycloakASG --> AuroraCluster[(Aurora Cluster)]
         end
         
-        subgraph "DynamoDB"
+        subgraph "CRM Performance Enhancements"
             DDBTable --> AutoScale[Auto-scaling]
             DDBTable --> DAX[DAX Cluster]
+            Lambda --> ElastiCache[ElastiCache]
         end
     end
 ```
@@ -96,12 +128,13 @@ flowchart TB
 - DynamoDB: Add DAX cluster for caching
 - API Gateway: Custom domain, WAF protection
 - Aurora: Multi-AZ cluster
+- ElastiCache: 2-node cluster for session caching
 
-### Phase 3: Scale (100K+ Users)
+### Phase 3: Enterprise CRM (250+ Users)
 
 ```mermaid
 flowchart TD
-    subgraph "Phase 3: Full Scale"
+    subgraph "Phase 3: Enterprise CRM"
         APICloudFront[CloudFront] --> APIGW[API Gateway]
         APIGW --> Lambda[Lambda Functions]
         APIGW --> StepF[Step Functions]
@@ -109,7 +142,9 @@ flowchart TD
         subgraph "Compute Layer"
             Lambda --> LambdaPower[Lambda Power Tuning]
             StepF --> FargateECS[Fargate ECS Cluster]
-            FargateECS --> ContainerOptimization[Optimized Containers]
+            FargateECS --> ReportingContainers[Reporting Containers]
+            FargateECS --> AnalyticsContainers[Analytics Containers]
+            FargateECS --> ImportExportContainers[Import/Export Containers]
         end
         
         subgraph "Data Layer"
@@ -117,6 +152,7 @@ flowchart TD
             DDBAdvanced --> GSIOptimization[GSI Optimization]
             DDBAdvanced --> DAXMultiAZ[DAX Multi-AZ]
             Lambda --> S3Intelligent[S3 Intelligent Tiering]
+            Lambda --> Redis[ElastiCache Redis Cluster]
         end
         
         subgraph "Authentication"
@@ -127,9 +163,9 @@ flowchart TD
     end
 ```
 
-## Auto-Scaling Configurations
+## Auto-Scaling Configurations for CRM Workloads
 
-### Lambda Scaling
+### Lambda Scaling for CRM Operations
 
 ```mermaid
 graph TD
@@ -137,31 +173,33 @@ graph TD
     AutoScale --> ProvisionedConcurrency[Provisioned Concurrency]
     AutoScale --> ReservedConcurrency[Reserved Concurrency]
     
-    subgraph "Function-Specific Sizing"
-        APIFunctions[API Functions: 128-256MB]
-        ProcessingFunctions[Processing Functions: 1-3GB]
-        CoordinationFunctions[Coordination Functions: 256MB]
+    subgraph "CRM Function-Specific Sizing"
+        CustomerAPIs[Customer APIs: 256MB]
+        OpportunityAPIs[Opportunity APIs: 256MB]
+        ReportingAPIs[Reporting APIs: 1GB]
+        AnalyticsAPIs[Analytics APIs: 3GB]
+        NotificationFunctions[Notification Functions: 128MB]
     end
 ```
 
-### Fargate Scaling
+### Fargate Scaling for CRM Tasks
 
 ```mermaid
 graph TD
     CPUUtilization[CPU Utilization] --> FargateScaling{Auto-scaling}
     MemoryUtilization[Memory Utilization] --> FargateScaling
-    QueueDepth[SQS Queue Depth] --> FargateScaling
+    TaskQueue[CRM Task Queue Depth] --> FargateScaling
     
     FargateScaling --> FargateService[Fargate Service]
     
-    subgraph "Task Sizing Tiers"
-        Small[Small: 0.25 vCPU, 0.5GB]
-        Medium[Medium: 1 vCPU, 2GB]
-        Large[Large: 4 vCPU, 8GB]
+    subgraph "CRM Task Sizing Tiers"
+        StandardReports[Standard Reports: 0.5 vCPU, 1GB]
+        DataImport[Data Import: 1 vCPU, 2GB]
+        AdvancedAnalytics[Advanced Analytics: 4 vCPU, 8GB]
     end
 ```
 
-### DynamoDB Scaling
+### DynamoDB Scaling for CRM Data
 
 ```mermaid
 graph TD
@@ -169,14 +207,15 @@ graph TD
     DDBScaling --> ReadCapacity[Read Capacity]
     DDBScaling --> WriteCapacity[Write Capacity]
     
-    subgraph "Scaling Parameters"
-        TargetUtilization[Target Utilization: 70%]
-        MinCapacity[Min Capacity: Table-specific]
-        MaxCapacity[Max Capacity: Table-specific]
+    subgraph "CRM Table-Specific Scaling"
+        CustomersTable[Customers: 25-100 RCU/WCU]
+        ContactsTable[Contacts: 50-200 RCU/WCU]
+        OpportunitiesTable[Opportunities: 25-100 RCU/WCU]
+        ActivitiesTable[Activities: 100-400 RCU/WCU]
     end
 ```
 
-## Cost Optimization Strategies
+## Cost Optimization Strategies for Zebros CRM
 
 ```mermaid
 flowchart TD
@@ -186,24 +225,27 @@ flowchart TD
     
     S3Opt --> Lifecycle[Lifecycle Policies]
     S3Opt --> Compression[Data Compression]
+    S3Opt --> S3IA[Infrequent Access for Old Files]
     
     ComputeOpt --> RightSizing[Function Right-Sizing]
     ComputeOpt --> Reserved[Reserved Concurrency]
+    ComputeOpt --> FargateSpot[Fargate Spot for Reports]
     
     DBOpt --> DynamoOnDemand[On-demand for Variable Loads]
     DBOpt --> DynamoProvisioned[Provisioned for Predictable Loads]
+    DBOpt --> TTLSettings[TTL for Temporary Data]
 ```
 
-## Scaling Triggers and Thresholds
+## CRM-Specific Scaling Triggers and Thresholds
 
 ```mermaid
 flowchart TD
-    subgraph "Scaling Triggers"
+    subgraph "CRM Scaling Triggers"
         APILatency[API Latency > 200ms]
         CPUUtil[CPU Utilization > 70%]
         MemUtil[Memory Utilization > 70%]
-        Errors[Error Rate > 1%]
-        Concurrency[Concurrency > 80% of limit]
+        TaskQueue[Report Queue > 10 tasks]
+        UserConcurrency[> 50 concurrent users]
     end
     
     subgraph "Scaling Actions"
@@ -211,23 +253,51 @@ flowchart TD
         LambdaConcurrency[Increase Lambda Concurrency]
         FargateTasks[Increase Fargate Tasks]
         DBCapacity[Increase DB Capacity]
+        CacheSize[Increase Cache Size]
     end
     
     APILatency --> LambdaMemory
     CPUUtil --> FargateTasks
     MemUtil --> LambdaMemory
-    Errors --> Diagnostics[Diagnostics]
-    Concurrency --> LambdaConcurrency
+    TaskQueue --> FargateTasks
+    UserConcurrency --> DBCapacity
+    UserConcurrency --> CacheSize
 ```
 
-## Monitoring for Scale
+## Multi-Region Strategy for Global CRM Deployment
 
-Key metrics for monitoring scaling needs:
+```mermaid
+flowchart TD
+    subgraph "Global CRM Architecture"
+        PrimaryRegion[Primary Region]
+        SecondaryRegion[Secondary Region]
+        
+        PrimaryRegion --> |Replication| SecondaryRegion
+        
+        PrimaryRegion --> |Active| PrimaryDB[(Primary Database)]
+        SecondaryRegion --> |Read Replica| SecondaryDB[(Secondary Database)]
+        
+        Route53[Route 53] --> |Traffic Routing| PrimaryRegion
+        Route53 --> |Failover| SecondaryRegion
+    end
+    
+    subgraph "Global Tables"
+        DDBGlobal[DynamoDB Global Tables]
+        S3Replication[S3 Cross-Region Replication]
+    end
+```
+
+## Monitoring for Zebros CRM Scale
+
+Key metrics for monitoring CRM scaling needs:
 
 - Per-endpoint latency (p95, p99)
-- Concurrent Lambda executions
-- DynamoDB consumed capacity
-- Step Function execution time
-- Fargate CPU/memory utilization
-- API Gateway request count
-- API Gateway integration latency
+- Concurrent Lambda executions by function type
+- DynamoDB consumed capacity by entity type (customers, contacts, opportunities)
+- Step Function execution time for report generation
+- Fargate CPU/memory utilization during peak hours
+- API Gateway request count by business hours
+- Active user sessions per hour
+- Report generation queue depth
+- File storage growth rate
+- Cache hit/miss ratios
